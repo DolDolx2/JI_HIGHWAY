@@ -4,7 +4,7 @@ export default async function handler(req,res){
  const key=process.env.EX_API_KEY;
  if(!key)return respond(res,503,{ok:false,code:"NOT_CONFIGURED"});
  const url=new URL("https://data.ex.co.kr/openapi/locationinfo/locationinfoIc");
- url.searchParams.set("key",key);url.searchParams.set("type","json");
+ url.searchParams.set("key",key);url.searchParams.set("type","json");url.searchParams.set("numOfRows","1000");url.searchParams.set("pageNo","1");
  try{
   const doc=await getJSON(url.toString());
   const raw=Array.isArray(doc?.list)?doc.list:Array.isArray(doc?.locationinfoIc)?doc.locationinfoIc:typeof doc?.list==="object"&&doc.list?[doc.list]:[];
