@@ -77,10 +77,39 @@ test("EX congestion normalizes conzone readings and never leaks API key",async()
   assert.equal(res.payload.sections.length,1);
   assert.equal(res.payload.sections[0].segment,"양재IC-판교IC");
   assert.equal(res.payload.sections[0].speed,31);
+  assert.equal(res.payload.sections[0].grade,3);
+  assert.equal(res.payload.totalRead,1);
   assert.ok(!JSON.stringify(res.payload).includes("unit-test-secret"));
  })(async (url)=>{
-  assert.equal(new URL(url).searchParams.get("serviceKey"),"unit-test-secret");
-  return okay({list:[{routeName:"경부선",conzoneName:"양재IC-판교IC",speed:"31",grade:"4",stdDate:"20261122",stdHour:"21"}]});
+  assert.equal(new URL(url).searchParams.get("key"),"unit-test-secret");
+  return okay({list:[{routeName:"경부선",conzoneName:"양재IC-판교IC",speed:"31",grade:"3",stdDate:"20261122",stdHour:"21"}]});
  })}
  finally{if(prior===undefined)delete process.env.EX_API_KEY;else process.env.EX_API_KEY=prior}
+});
+
+test("Realtime feed excludes smooth-grade rows and exposes real sampling time",async()=>{
+ const handler=(await import("../api/congestion.js")).default;
+ const previous=process.env.EX_API_KEY;process.env.EX_API_KEY="test-key";
+ try{
+  await withFetch(async()=>{
+   const res=fakeResponse();await handler({method:"GET"},res);
+   assert.equal(res.code,200);
+   assert.equal(res.payload.totalRead,3);
+   assert.deepEqual(res.payload.sections.map(x=>x.grade),[3,2]);
+   assert.equal(res.payload.sections[0].sampledAt,"20261122 2150");
+  })(async()=>okay({list:[
+   {routeNo:"0010",routeName:"경부선",conzoneName:"A",grade:1,speed:101},
+   {routeNo:"0010",routeName:"경부선",conzoneName:"B",grade:2,speed:50},
+   {routeNo:"0010",routeName:"경부선",conzoneName:"C",grade:3,speed:18,stdDate:"20261122",stdHour:"2150"}
+  ]}));
+ }finally{if(previous===undefined)delete process.env.EX_API_KEY;else process.env.EX_API_KEY=previous}
+});
+test("Realtime feed never reports unknown API schema as valid empty congestion",async()=>{
+ const handler=(await import("../api/congestion.js")).default;
+ const previous=process.env.EX_API_KEY;process.env.EX_API_KEY="test-key";
+ try{await withFetch(async()=>{
+  const res=fakeResponse();await handler({method:"GET"},res);
+  assert.equal(res.code,502);assert.equal(res.payload.code,"RESPONSE_SCHEMA");
+ })(async()=>okay({code:"SUCCESS",unexpected:true}))}
+ finally{if(previous===undefined)delete process.env.EX_API_KEY;else process.env.EX_API_KEY=previous}
 });
