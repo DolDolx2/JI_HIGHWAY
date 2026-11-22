@@ -113,3 +113,16 @@ test("Realtime feed never reports unknown API schema as valid empty congestion",
  })(async()=>okay({code:"SUCCESS",unexpected:true}))}
  finally{if(previous===undefined)delete process.env.EX_API_KEY;else process.env.EX_API_KEY=previous}
 });
+
+test("ITS CCTV XML and JSON parsing preserve cameras and safely distinguish stream protocols",async()=>{
+ const {parseCctvPayload,sanitizeCameras}=await import("../api/_cctv_parse.js");
+ const xml='<response><coordtype>1</coordtype><datacount>2</datacount><data><cctvname>경부선 &amp; 청주</cctvname><coordx>127.49</coordx><coordy>36.65</coordy><cctvurl>http://example.org/a.m3u8</cctvurl><cctvformat>HLS</cctvformat></data><data><cctvname>영동선</cctvname><coordx>127.3</coordx><coordy>37.2</coordy><cctvurl>https://example.org/b.m3u8</cctvurl></data></response>';
+ const cameras=sanitizeCameras(parseCctvPayload(xml));
+ assert.equal(cameras.length,2);
+ assert.equal(cameras[0].name,"경부선 & 청주");
+ assert.equal(cameras[0].playable,false);
+ assert.equal(cameras[1].playable,true);
+ const json=JSON.stringify({response:{data:[{cctvname:"정상",coordx:127.49,coordy:36.65,cctvurl:"https://example.org/live.m3u8"}]}});
+ assert.equal(sanitizeCameras(parseCctvPayload(json)).length,1);
+ assert.throws(()=>parseCctvPayload("<invalid/>"),/RESPONSE_SCHEMA/);
+});
