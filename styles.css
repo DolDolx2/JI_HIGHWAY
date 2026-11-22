@@ -14,3 +14,12 @@
 .live-camera-select select{flex:1;min-width:160px;max-width:100%;border:1px solid #d5e2ee;border-radius:9px;padding:10px;background:white}
 .live-camera-select button{flex:0 0 auto}
 .live-cam-player video{background:#0b2034;border-radius:9px}
+
+/* Live API source health panel */
+.diaglist{margin:12px 0;border:1px solid #e3ebf3;border-radius:11px;overflow:hidden}
+.diagrow{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 12px;border-bottom:1px solid #edf1f6;background:#fff}
+.diagrow:last-child{border-bottom:0}
+.diagrow strong{font-size:13px}
+.diagstatus{flex-shrink:0;padding:5px 8px;border-radius:7px;font-size:11px;font-weight:750;background:#f0f3f7;color:#627184}
+.diagstatus.ok{background:#dff5e8;color:#177842}.diagstatus.fail{background:#ffe4e4;color:#bd2929}
+.diagstatus.empty{background:#fff2da;color:#946300}.diagstatus.busy{background:#e4f1ff;color:#145fa6}

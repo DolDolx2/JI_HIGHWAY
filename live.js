@@ -38,10 +38,46 @@ function liveIC(){
  (L.busy==="ics"||L.busy==="ic-route"?msg("조회 중입니다..."):"")+
  routeSummary(L.route)+'</section>';
 }
+const checks={ex:{title:"도로공사 IC/JCT",state:"unchecked",detail:"아직 검사하지 않음"},
+tmapPoi:{title:"TMAP 장소검색",state:"unchecked",detail:"아직 검사하지 않음"},
+tmapRoute:{title:"TMAP 경로계산",state:"unchecked",detail:"아직 검사하지 않음"},
+cctv:{title:"ITS CCTV",state:"unchecked",detail:"아직 검사하지 않음"},
+congestion:{title:"도로공사 정체정보",state:"unchecked",detail:"아직 검사하지 않음"}};
+let checkedAt="";
+function statusLabel(v){return ({ok:"정상",fail:"연결 실패",empty:"데이터 미확인",unchecked:"미검사",busy:"확인 중"})[v]||"미검사"}
 function homeStatus(){
- const f=L.status?.configured||{};
- const item=(label,ok)=>'<span class="live-api-status '+(ok?"ok":"off")+'">'+safe(label)+' '+(ok?"설정됨":"미확인")+'</span>';
- return '<section class="section live-section"><div class="sectiontitle"><h2>실시간 API 연결 상태</h2><span class="live-badge">서버 측 확인</span></div><div class="live-statusrow">'+item("도로공사",f.ex)+item("CCTV",f.cctv)+item("TMAP",f.tmap)+'</div><p class="muted tiny">키 설정 여부만 확인합니다. 제공처 인증 및 실데이터 조회 성공 여부와는 다릅니다.</p><div class="actions"><button class="secondary" data-live="load-ics">IC/JCT 데이터 확인</button><button class="secondary" data-live="open-live-route">실제 경로 조회</button></div></section>';
+ const flags=L.status?.configured||{};
+ const keyStatus='<div class="muted tiny">API 키 등록: 도로공사 '+(flags.ex?"확인":"미확인")+' / CCTV '+(flags.cctv?"확인":"미확인")+' / TMAP '+(flags.tmap?"확인":"미확인")+' (실제 연결 상태와 별개)</div>';
+ const rows=Object.values(checks).map(x=>'<div class="diagrow"><div><strong>'+safe(x.title)+'</strong><div class="muted tiny">'+safe(x.detail)+'</div></div><span class="diagstatus '+safe(x.state)+'">'+statusLabel(x.state)+'</span></div>').join("");
+ return '<section class="section live-section"><div class="sectiontitle"><h2>실제 데이터 연동 점검</h2><span class="live-badge">API별 확인</span></div>'+
+ '<p class="muted tiny">인증키 등록 여부가 아닌 실제 서버 응답을 확인합니다. CCTV는 연결 대기시간이 발생할 수 있습니다.</p>'+
+ '<div class="diaglist">'+rows+'</div>'+keyStatus+
+ (L.statusError?msg(L.statusError):"")+
+ (checkedAt?'<p class="muted tiny">마지막 검사 '+safe(checkedAt)+'</p>':"")+
+ '<button class="primary" style="margin-top:10px" data-live="diagnostics" '+(L.busy?"disabled":"")+'>API 실제 연결 검사 '+(L.busy==="diagnostics"?"진행 중...":"↻")+'</button>'+
+ '<div class="actions"><button class="secondary" data-live="open-live-route">IC/JCT 조회</button><button class="secondary" data-action="destination">목적지 검색</button></div></section>';
+}
+async function diagnostics(){
+ const tests=[
+ ["ex","/api/ics",r=>({state:r.locations?.length?"ok":"empty",detail:"실제 IC/JCT "+(r.locations?.length||0)+"곳 수신"})],
+ ["tmapPoi","/api/pois?q="+encodeURIComponent("서울역"),r=>({state:r.pois?.length?"ok":"empty",detail:"장소 검색 "+(r.pois?.length||0)+"건 수신"})],
+ ["tmapRoute","/api/route",r=>({state:r.distanceKm>0&&r.durationMin>0?"ok":"empty",detail:"거리 "+r.distanceKm+"km · 예상 "+r.durationMin+"분"})],
+ ["cctv","/api/cctv?lat=36.65&lon=127.49",r=>({state:r.cameras?.length?"ok":"empty",detail:"CCTV "+(r.cameras?.length||0)+"대 수신 (영상 재생 별도 검증)"})],
+ ["congestion","/api/congestion",r=>({state:r.sections?.length?"ok":"empty",detail:r.sections?.length?"정체정보 "+r.sections.length+"건":"유효한 정체 데이터 0건"})]
+ ];
+ L.busy="diagnostics";
+ for(const t of tests){checks[t[0]].state="busy";checks[t[0]].detail="서버 응답 확인 중"}
+ mount(true);
+ await Promise.all(tests.map(async ([k,url,mapper])=>{
+   try{
+    const init=k==="tmapRoute"?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({startLat:36.65,startLon:127.49,endLat:36.7,endLon:127.52})}:undefined;
+    const data=await request(url,init);
+    Object.assign(checks[k],mapper(data));
+   }catch(e){checks[k].state="fail";checks[k].detail=e.message}
+   mount(true);
+ }));
+ checkedAt=new Date().toLocaleString("ko-KR");
+ L.busy="";mount(true);
 }
 function cameraPanel(){
  return '<section class="section live-section"><div class="sectiontitle"><h2>실시간 CCTV · 현재 위치 주변</h2><span class="live-badge">ITS API</span></div><p class="muted tiny">GPS 현재 위치 또는 선택한 IC 부근의 카메라를 조회합니다. 조회 경로 진행 방향 정렬 기능은 아직 없습니다.</p><div class="actions"><button class="secondary" data-live="camera-gps" '+(L.busy?"disabled":"")+'>⌖ 현재 위치 CCTV</button><button class="secondary" data-live="camera-ic" '+(L.busy?"disabled":"")+'>선택 IC 부근</button></div>'+
@@ -112,6 +148,7 @@ document.addEventListener("click",async e=>{
  const el=e.target.closest("[data-live]");if(!el)return;
  const a=el.dataset.live;
  if(a==="open-live-route"){setPage("ic");return}
+ if(a==="diagnostics"){if(!L.busy)diagnostics();return}
  if(L.busy)return;
  if(a==="load-ics"){L.icError="";busyStart("ics");try{L.ics=null;await ics()}catch(err){L.icError=err.message}finally{busyEnd()}return}
  if(a==="ic-route"){
