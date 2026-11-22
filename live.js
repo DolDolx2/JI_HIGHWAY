@@ -64,6 +64,28 @@ async function fetchRoute(a,b){
  const r=await request("/api/route",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({startLat:a.lat,startLon:a.lon,endLat:b.lat,endLon:b.lon})});
  return r;
 }
+
+function drawRoute(r){
+ const raw=Array.isArray(r?.polyline)?r.polyline:[];
+ const pts=raw.filter(p=>Array.isArray(p)&&p.length>=2&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&p[0]>=124&&p[0]<=132&&p[1]>=33&&p[1]<=39);
+ if(pts.length<2)return msg("경로 좌표를 아직 제공받지 못했습니다.");
+ const latCenter=pts.reduce((n,p)=>n+p[1],0)/pts.length;
+ const scale=Math.cos(latCenter*Math.PI/180);
+ const xs=pts.map(p=>p[0]*scale),ys=pts.map(p=>p[1]);
+ let west=Math.min(...xs),east=Math.max(...xs),south=Math.min(...ys),north=Math.max(...ys);
+ const dx=Math.max(east-west,0.0001),dy=Math.max(north-south,0.0001),k=Math.min(340/dx,260/dy);
+ const ox=180-(east-west)*k/2,oy=140-(north-south)*k/2;
+ const coords=pts.map((p,i)=>[(ox+(xs[i]-west)*k).toFixed(1),(oy+(north-ys[i])*k).toFixed(1)]);
+ const path=coords.map((p,i)=>(i?"L":"M")+p.join(" ")).join(" ");
+ const start=coords[0],end=coords[coords.length-1];
+ return '<div class="mapbox" style="height:330px"><svg viewBox="0 0 360 280" width="100%" height="100%" role="img" aria-label="TMAP 실제 경로 형상">'+
+ '<rect width="360" height="280" fill="#eaf2f6"/><path d="'+path+'" fill="none" stroke="#fff" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>'+
+ '<path d="'+path+'" fill="none" stroke="#1674d0" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>'+
+ '<circle cx="'+start[0]+'" cy="'+start[1]+'" r="8" fill="#259a55" stroke="white" stroke-width="3"/>'+
+ '<circle cx="'+end[0]+'" cy="'+end[1]+'" r="8" fill="#dc4141" stroke="white" stroke-width="3"/></svg>'+
+ '<div class="mapstamp">TMAP 실제 경로 형상 · 배경 지도 아님</div></div><p class="muted tiny">GPS 좌표로 그린 경로입니다. 지도 타일 및 정체 색상은 후속 연동 예정입니다.</p>';
+}
+
 function mount(force=false){
  const main=document.querySelector("#app .content");if(!main)return;
  if(main.dataset.liveMount&&!force)return;
@@ -75,7 +97,7 @@ function mount(force=false){
  if(p==="cctv")html=cameraPanel();
  if(p==="destination")html=destinationPanel();
  if(p==="destresults")html=destinationPanel();
- if(p==="map")html=(L.route||L.destRoute?'<section class="section live-section"><h2>실제 경로 API 데이터</h2>'+routeSummary(L.route||L.destRoute)+msg("지도 타일 및 실경로 좌표 렌더링은 후속 단계입니다.")+'</section>':msg("실제 경로를 조회하면 요약 정보를 표시합니다."));
+ if(p==="map")html=(L.route||L.destRoute?'<section class="section live-section"><h2>TMAP 실제 경로</h2>'+routeSummary(L.route||L.destRoute)+drawRoute(L.route||L.destRoute)+'</section>':msg("실제 경로를 조회하면 요약 정보를 표시합니다."));
  if(html){
   let target=main.querySelector("#live-content");
   if(!target){target=document.createElement("div");target.id="live-content";main.insertBefore(target,main.firstChild)}
