@@ -100,8 +100,9 @@ function mount(force=false){
  if(p==="map")html=(L.route||L.destRoute?'<section class="section live-section"><h2>TMAP 실제 경로</h2>'+routeSummary(L.route||L.destRoute)+drawRoute(L.route||L.destRoute)+'</section>':msg("실제 경로를 조회하면 요약 정보를 표시합니다."));
  if(html){
   let target=main.querySelector("#live-content");
-  if(!target){target=document.createElement("div");target.id="live-content";main.insertBefore(target,main.firstChild)}
-  // Do not replace an active input during its own typing.
+  // The first version left sample cards below the live widgets. Replace them
+  // rather than presenting contradictory demo and real search controls.
+  if(!target){target=document.createElement("div");target.id="live-content";main.replaceChildren(target)}
   if(document.activeElement&&target.contains(document.activeElement)&&!force)return;
   target.innerHTML=html;
  }
