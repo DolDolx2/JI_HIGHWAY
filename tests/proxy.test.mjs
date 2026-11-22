@@ -66,3 +66,21 @@ test("POI rejects one-letter search",async()=>{
  try{const res=fakeResponse();await poisHandler({method:"GET",query:{q:"가"}},res);assert.equal(res.code,400)}
  finally{if(prev===undefined)delete process.env.TMAP_APP_KEY;else process.env.TMAP_APP_KEY=prev}
 });
+
+test("EX congestion normalizes conzone readings and never leaks API key",async()=>{
+ const handler=(await import("../api/congestion.js")).default;
+ const prior=process.env.EX_API_KEY;process.env.EX_API_KEY="unit-test-secret";
+ try{await withFetch(async()=>{
+  const res=fakeResponse();
+  await handler({method:"GET"},res);
+  assert.equal(res.code,200);
+  assert.equal(res.payload.sections.length,1);
+  assert.equal(res.payload.sections[0].segment,"양재IC-판교IC");
+  assert.equal(res.payload.sections[0].speed,31);
+  assert.ok(!JSON.stringify(res.payload).includes("unit-test-secret"));
+ })(async (url)=>{
+  assert.equal(new URL(url).searchParams.get("serviceKey"),"unit-test-secret");
+  return okay({list:[{routeName:"경부선",conzoneName:"양재IC-판교IC",speed:"31",grade:"4",stdDate:"20261122",stdHour:"21"}]});
+ })}
+ finally{if(prior===undefined)delete process.env.EX_API_KEY;else process.env.EX_API_KEY=prior}
+});
