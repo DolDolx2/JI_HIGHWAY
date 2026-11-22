@@ -3,14 +3,19 @@ export default async function handler(req,res){
  if(!requireGET(req,res))return;
  const key=process.env.EX_API_KEY;
  if(!key)return respond(res,503,{ok:false,code:"NOT_CONFIGURED"});
- // The EX OpenAPI guide documents unitList (tollgate list), not a complete IC/JCT graph.
- const url=new URL("https://data.ex.co.kr/openapi/basicinfo/unitList");
+ const url=new URL("https://data.ex.co.kr/openapi/locationinfo/locationinfoIc");
  url.searchParams.set("key",key);url.searchParams.set("type","json");
  try{
   const doc=await getJSON(url.toString());
-  const list=Array.isArray(doc?.list)?doc.list:Array.isArray(doc?.unitList)?doc.unitList:[];
-  const normalized=list.map(x=>({name:String(x.unitName||"").trim(),code:String(x.unitCode||"").trim()})).filter(x=>x.name&&x.code).slice(0,1500);
-  if(!normalized.length)return respond(res,502,{ok:false,code:"RESPONSE_SCHEMA",message:"영업소 목록 응답 구조를 확인해야 합니다."});
-  return respond(res,200,{ok:true,source:"한국도로공사 영업소 목록",stations:normalized,at:new Date().toISOString()},true);
+  const raw=Array.isArray(doc?.list)?doc.list:Array.isArray(doc?.locationinfoIc)?doc.locationinfoIc:typeof doc?.list==="object"&&doc.list?[doc.list]:[];
+  const locations=raw.map(x=>({
+   name:String(x.icName||"").trim(),
+   code:String(x.icCode||"").trim(),
+   road:String(x.routeName||"").trim(),
+   lon:Number(x.xValue),
+   lat:Number(x.yValue)
+  })).filter(x=>x.name).slice(0,2000);
+  if(!locations.length)return respond(res,502,{ok:false,code:"RESPONSE_SCHEMA",message:"IC/JCT 위치정보 응답 형식을 검증해야 합니다."});
+  return respond(res,200,{ok:true,source:"한국도로공사 IC/JCT 위치정보",locations,at:new Date().toISOString()},true);
  }catch(e){return upstreamFailure(res,e)}
 }
