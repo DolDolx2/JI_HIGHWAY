@@ -82,7 +82,7 @@ test("EX congestion normalizes conzone readings and never leaks API key",async()
   assert.ok(!JSON.stringify(res.payload).includes("unit-test-secret"));
  })(async (url)=>{
   assert.equal(new URL(url).searchParams.get("key"),"unit-test-secret");
-  return okay({list:[{routeName:"경부선",conzoneName:"양재IC-판교IC",speed:"31",grade:"3",stdDate:"20261122",stdHour:"21"}]});
+  return okay({list:[{routeNo:"0010",routeName:"경부선",conzoneName:"양재IC-판교IC",speed:"31",grade:"3",stdDate:"20261122",stdHour:"21"}]});
  })}
  finally{if(prior===undefined)delete process.env.EX_API_KEY;else process.env.EX_API_KEY=prior}
 });
